@@ -1,14 +1,6 @@
 import React, { useEffect } from 'react';
 import { useCompletion } from '../hooks/useCompletion';
-
-interface LLMInputProps {
-  value: string;
-  onChange: (value: string) => void;
-  onComplete?: (completedText: string) => void;
-  placeholder?: string;
-  getSuggestion: (input: string) => Promise<string>;
-  className?: string;
-}
+import type { LLMInputProps } from '../types';
 
 export const LLMInput: React.FC<LLMInputProps> = ({
   value,
@@ -18,7 +10,15 @@ export const LLMInput: React.FC<LLMInputProps> = ({
   getSuggestion,
   className = '',
 }) => {
-  const { state, dispatch, debouncedFetch } = useCompletion(getSuggestion);
+  let completionData;
+  try {
+    completionData = useCompletion(getSuggestion);
+  } catch (error) {
+    console.error('Error in useCompletion:', error);
+    throw error;
+  }
+  
+  const { state, dispatch, debouncedFetch } = completionData;
 
   // 入力変更時にAPI呼び出し（valueの変更を直接監視）
   useEffect(() => {

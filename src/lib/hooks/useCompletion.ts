@@ -1,18 +1,5 @@
 import { useReducer, useCallback, useRef, useMemo } from 'react';
-
-// 状態の型定義
-export interface CompletionState {
-  suggestion: string;
-  showSuggestion: boolean;
-  isLoading: boolean;
-}
-
-// アクションの型定義
-export type CompletionAction =
-  | { type: 'SUGGESTION_RECEIVED'; payload: string }
-  | { type: 'SUGGESTION_DISMISSED' }
-  | { type: 'LOADING_START' }
-  | { type: 'LOADING_END' };
+import type { CompletionState, CompletionAction } from '../types';
 
 // 初期状態
 const initialState: CompletionState = {
@@ -60,7 +47,7 @@ const completionReducer = (
 
 // デバウンス関数
 const debounce = (func: (input: string) => Promise<void>, delay: number) => {
-  let timeoutId: number;
+  let timeoutId: ReturnType<typeof setTimeout>;
   return (input: string) => {
     clearTimeout(timeoutId);
     timeoutId = setTimeout(() => func(input), delay);
@@ -71,49 +58,54 @@ const debounce = (func: (input: string) => Promise<void>, delay: number) => {
 export const useCompletion = (getSuggestion: (input: string) => Promise<string>) => {
   const [state, dispatch] = useReducer(completionReducer, initialState);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const getSuggestionRef = useRef(getSuggestion);
+
+  // getSuggestion関数の参照を更新
+  getSuggestionRef.current = getSuggestion;
 
   // 補完候補取得関数
-  const fetchSuggestion = useCallback(
-    async (input: string) => {
-      // 前のリクエストをキャンセル
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
+  const fetchSuggestion = useCallback(async (input: string) => {
+    // 前のリクエストをキャンセル
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
 
-      if (input.length < 3) {
+    if (input.length < 3) {
+      dispatch({ type: 'SUGGESTION_DISMISSED' });
+      return;
+    }
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    try {
+      dispatch({ type: 'LOADING_START' });
+      const result = await getSuggestionRef.current(input);
+
+      if (!controller.signal.aborted && result) {
+        dispatch({ type: 'SUGGESTION_RECEIVED', payload: result });
+      }
+    } catch (error) {
+      if (!controller.signal.aborted) {
+        console.error('Suggestion fetch error:', error);
         dispatch({ type: 'SUGGESTION_DISMISSED' });
-        return;
       }
-
-      const controller = new AbortController();
-      abortControllerRef.current = controller;
-
-      try {
-        dispatch({ type: 'LOADING_START' });
-        const result = await getSuggestion(input);
-
-        if (!controller.signal.aborted && result) {
-          dispatch({ type: 'SUGGESTION_RECEIVED', payload: result });
-        }
-      } catch (error) {
-        if (!controller.signal.aborted) {
-          console.error('Suggestion fetch error:', error);
-          dispatch({ type: 'SUGGESTION_DISMISSED' });
-        }
-      } finally {
-        if (!controller.signal.aborted) {
-          dispatch({ type: 'LOADING_END' });
-        }
+    } finally {
+      if (!controller.signal.aborted) {
+        dispatch({ type: 'LOADING_END' });
       }
-    },
-    [getSuggestion]
-  );
+    }
+  }, []); // 依存関係を空にして安定化
 
   // デバウンス付きAPI呼び出し
-  const debouncedFetch = useMemo(
-    () => debounce(fetchSuggestion, 300),
-    [fetchSuggestion]
-  );
+  const debouncedFetch = useMemo(() => {
+    try {
+      return debounce(fetchSuggestion, 300);
+    } catch (error) {
+      console.error('Error creating debounced fetch:', error);
+      return fetchSuggestion;
+    }
+  }, [fetchSuggestion]);
 
   return { state, dispatch, debouncedFetch };
 };

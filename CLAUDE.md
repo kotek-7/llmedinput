@@ -95,3 +95,7 @@ This project is intended to become a React library for LLM input components. Whe
 @.claude/docs/dropdown-prototype-plan.md
 
 @.claude/docs/copilot-inline-prototype-plan.md
+
+## Development Guidelines
+
+- ユーザはすでに別のインスタンスでpnpm devでアプリをホストしているので、Claude codeはユーザにpnpm devの実行を提案しないでください

@@ -2,6 +2,7 @@ import './App.css';
 import { BasicExample } from './examples/BasicExample';
 import { AdvancedExample } from './examples/AdvancedExample';
 import { CustomProviderExample } from './examples/CustomProviderExample';
+import { GeminiExample } from './examples/GeminiExample';
 
 function App() {
   return (
@@ -28,6 +29,7 @@ function App() {
 
         <section className="examples-container">
           <BasicExample />
+          <GeminiExample />
           <AdvancedExample />
           <CustomProviderExample />
         </section>
